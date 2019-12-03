@@ -33,6 +33,7 @@ def main():
     parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument("--break_iter", type=int, default=0)
     parser.add_argument("--start_iter", type=int, default=0)
+    parser.add_argument("--speed_only", action="store_true")
     parser.add_argument(
         "opts",
         help="Modify config options using the command-line",
@@ -97,6 +98,7 @@ def main():
             output_folder=output_folder,
             start_iter=args.start_iter,
             break_iter=args.break_iter,
+            speed_only=args.speed_only,
             cfg=cfg,
         )
         synchronize()

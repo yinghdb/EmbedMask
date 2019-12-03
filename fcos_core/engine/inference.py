@@ -14,7 +14,7 @@ from ..utils.comm import synchronize
 from ..utils.timer import Timer, get_time_str
 from .bbox_aug import im_detect_bbox_aug
 
-def compute_on_dataset(model, data_loader, device, timer=None, start_iter=0, break_iter=0):
+def compute_on_dataset(model, data_loader, device, timer=None, start_iter=0, break_iter=0, speed_only=False):
     model.eval()
     results_dict = {}
     cpu_device = torch.device("cpu")
@@ -37,10 +37,11 @@ def compute_on_dataset(model, data_loader, device, timer=None, start_iter=0, bre
             if timer:
                 torch.cuda.synchronize()
                 timer.toc()
-        output = [o.to(cpu_device) for o in output]
-        results_dict.update(
-            {img_id: result for img_id, result in zip(image_ids, output)}
-        )
+        if not speed_only:
+            output = [o.to(cpu_device) for o in output]
+            results_dict.update(
+                {img_id: result for img_id, result in zip(image_ids, output)}
+            )
 
     return results_dict
 
@@ -79,6 +80,7 @@ def inference(
         output_folder=None,
         start_iter=0,
         break_iter=0,
+        speed_only=False,
         cfg=None,
 ):
     # convert to a torch.device for efficiency
@@ -93,7 +95,7 @@ def inference(
         break_iter = len(dataset)
     total_timer.tic()
     predictions = compute_on_dataset(model, data_loader, device, inference_timer,
-                                     start_iter=start_iter, break_iter=break_iter)
+                                     start_iter=start_iter, break_iter=break_iter, speed_only=speed_only)
     # wait for all processes to complete before measuring the time
     synchronize()
     total_time = total_timer.toc()
@@ -112,6 +114,9 @@ def inference(
             num_devices,
         )
     )
+
+    if speed_only:
+        return
 
     predictions = _accumulate_predictions_from_multiple_gpus(predictions)
     if not is_main_process():
