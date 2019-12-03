@@ -44,6 +44,17 @@ The following inference command line run inference on coco minival split:
         MODEL.WEIGHT models/embed_mask_R50_1x.pth \
         TEST.IMS_PER_BATCH 4
 
+## Speed Testing
+
+The following inference command line run speed testing on coco minival split:
+
+    python tools/test_net.py \
+        --config-file configs/embed_mask/embed_mask_R50_1x.yaml \
+        --speed_only \
+        MODEL.WEIGHT models/embed_mask_R50_1x.pth \
+        TEST.IMS_PER_BATCH 1 \
+        MODEL.EMBED_MASK.POSTPROCESS_MASKS True
+
 ## Training
 
 The following command line will train 'embed_mask_R50_1x' on 4 GPUs:

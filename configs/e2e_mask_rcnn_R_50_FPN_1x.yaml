@@ -31,9 +31,8 @@ MODEL:
   MASK_ON: True
 DATASETS:
   TRAIN: ("coco_2014_train", "coco_2014_valminusminival")
-  TEST: ("coco_2017_test_benchmark",)
   # TEST: ("coco_2017_test_dev",)
-  # TEST: ("coco_2014_minival",)
+  TEST: ("coco_2014_minival",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 SOLVER:
