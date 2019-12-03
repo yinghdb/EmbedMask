@@ -57,7 +57,7 @@ The following inference command line run speed testing on coco minival split:
 
 ## Training
 
-The following command line will train 'embed_mask_R50_1x' on 4 GPUs:
+The following command line will train 'embed_mask_R50_1x' on 4 GPUs with batchsize 16:
 
     python -m torch.distributed.launch \
         --nproc_per_node=4 \
@@ -65,6 +65,7 @@ The following command line will train 'embed_mask_R50_1x' on 4 GPUs:
         tools/train_net.py \
         --config-file configs/embed_mask/embed_mask_R50_1x.yaml \
         DATALOADER.NUM_WORKERS 4 \
+        SOLVER.IMS_PER_BATCH 16 \
         OUTPUT_DIR training_dir/embed_mask_R50_1x
 
 ## Citations
