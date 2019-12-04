@@ -1,8 +1,9 @@
 # EmbedMask: Embedding Coupling for One-stage Instance Segmentation
 
-This This repository is for the paper:
+This is repository is for the paper:
 
-    []
+    EmbedMask: Embedding Coupling for One-stage Instance Segmentation
+    Hui Ying, Zhaojin Huang, Shu Liu, Tianjia Shao and Kun Zhou
 
 The full paper is available at: []. 
 
