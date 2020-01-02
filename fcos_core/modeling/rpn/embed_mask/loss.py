@@ -423,6 +423,11 @@ class EmbedMaskLossComputation(object):
                 if target_num > 0:
                     smooth_loss += (smooth_loss_im / target_num)
             smooth_loss = smooth_loss / N * self.loss_smooth_alpha
+        ######## MEANINGLESS LOSS #######
+        for i in range(len(proposal_embed)):
+            smooth_loss += 0 * proposal_embed.sum()
+            smooth_loss += 0 * proposal_margin.sum()
+        smooth_loss += 0 * pixel_embed.sum()
         ############ Mask Losses ##############
         # get target masks in prefer size
         N, _, m_h, m_w = pixel_embed.shape
