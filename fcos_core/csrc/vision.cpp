@@ -6,6 +6,7 @@
 #include "SigmoidFocalLoss.h"
 #include "deform_conv.h"
 #include "deform_pool.h"
+#include "MaskProb.h"
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("nms", &nms, "non-maximum suppression");
@@ -24,4 +25,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("modulated_deform_conv_backward", &modulated_deform_conv_backward, "modulated_deform_conv_backward");
   m.def("deform_psroi_pooling_forward", &deform_psroi_pooling_forward, "deform_psroi_pooling_forward");
   m.def("deform_psroi_pooling_backward", &deform_psroi_pooling_backward, "deform_psroi_pooling_backward");
+  m.def("maskprob_forward", &MaskProb_forward, "MaskProb_forward");
 }

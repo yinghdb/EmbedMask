@@ -10,6 +10,7 @@ from fcos_core.structures.boxlist_ops import remove_small_boxes
 from fcos_core.structures.boxlist_ops import boxes_to_masks
 from fcos_core.layers.misc import interpolate
 from fcos_core.structures.boxlist_ops import boxlist_ml_nms
+from fcos_core.layers import mask_prob_cuda
 import math
 
 INF = 100000000
@@ -142,17 +143,24 @@ class EmbedMaskPostProcessor(torch.nn.Module):
             results.append(boxlist)
 
         return results
+    
+    def compute_mask_prob(self, pixel_embed, proposal_embed, proposal_margin, boxes):
+        dim, m_h, m_w = pixel_embed.shape
+        pixel_embed = pixel_embed.view(dim, m_h * m_w).permute(1, 0)
 
-    def compute_mask_prob(self, pixel_embed, proposal_embed, proposal_margin):
-        m_h, m_w = pixel_embed.shape[-2:]
-        obj_num = proposal_embed.shape[0]
-        pixel_embed = pixel_embed.permute(1, 2, 0).unsqueeze(0).expand(obj_num, -1, -1, -1)
-        proposal_embed = proposal_embed.view(obj_num, 1, 1, -1).expand(-1, m_h, m_w, -1)
-        proposal_margin = proposal_margin.view(obj_num, 1, 1).expand(-1, m_h, m_w)
-        mask_var = torch.sum((pixel_embed - proposal_embed) ** 2, dim=3)
-        mask_prob = torch.exp(-mask_var*proposal_margin)
+        boxes = boxes.int()
+        boxes[:, 0] = torch.clamp(boxes[:, 0]-2, min=0)
+        boxes[:, 1] = torch.clamp(boxes[:, 1]-2, min=0)
+        boxes[:, 2] = torch.clamp(boxes[:, 2]+2, max=m_w)
+        boxes[:, 3] = torch.clamp(boxes[:, 3]+2, max=m_h)
 
-        return mask_prob
+        box_areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+        area_sum = box_areas.sum().item()
+
+        prob = mask_prob_cuda(pixel_embed, proposal_embed, proposal_margin, boxes, box_areas, area_sum, m_w)
+        prob = prob.view(-1, m_h, m_w)
+
+        return prob
 
     def forward_for_mask(self, boxlists, pixel_embed):
         N, dim, m_h, m_w = pixel_embed.shape
@@ -181,7 +189,7 @@ class EmbedMaskPostProcessor(torch.nn.Module):
             mask_boxes = boxes / stride
             box_masks = boxes_to_masks(mask_boxes, m_h, m_w)
             proposal_margin = boxlist.get_field('proposal_margin')
-            mask_prob = self.compute_mask_prob(pixel_embed[im], proposal_embed, proposal_margin)
+            mask_prob = self.compute_mask_prob(pixel_embed[im], proposal_embed, proposal_margin, mask_boxes)
             masks = mask_prob * box_masks.float()
 
             if self.post_process_masks:

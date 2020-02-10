@@ -25,6 +25,7 @@ from .dcn.deform_pool_module import DeformRoIPooling, DeformRoIPoolingPack, \
 
 from .interpolate import InterpolateModule
 from .lovasz_hinge_loss import LovaszHinge
+from .mask_prob import mask_prob_cuda
 
 __all__ = [
     "nms",
@@ -54,4 +55,5 @@ __all__ = [
     "Scale",
     "InterpolateModule",
     "LovaszHinge",
+    "mask_prob_cuda"
 ]

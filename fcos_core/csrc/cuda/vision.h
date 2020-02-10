@@ -2,6 +2,16 @@
 #pragma once
 #include <torch/extension.h>
 
+at::Tensor MaskProb_forward_cuda(
+		const at::Tensor& embed_pixel,
+        const at::Tensor& embed_center,
+        const at::Tensor& sigma_center,
+        const at::Tensor& boxes,
+        const at::Tensor& box_areas,
+        const int area_sum,
+        const int mask_width); 
+
+
 at::Tensor SigmoidFocalLoss_forward_cuda(
 		const at::Tensor& logits,
                 const at::Tensor& targets,
