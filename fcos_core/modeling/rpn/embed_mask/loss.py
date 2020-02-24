@@ -229,7 +229,7 @@ class EmbedMaskLossComputation(object):
         pos_indexes_for_targets = []
         for im in range(len(targets)):
             pos_indexes_for_targets_per_im = []
-            box_regression_im = [box_regression[l][im].detach().view(4, -1).transpose(0, 1).contiguous() for l in
+            box_regression_im = [box_regression[l][im].detach().view(4, -1).transpose(0, 1).contiguous() * self.fpn_strides[l] for l in
                                  range(len(box_regression))]
             box_regression_im = torch.cat(box_regression_im, dim=0)
             for t_id in range(len(targets[im])):
