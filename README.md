@@ -7,6 +7,7 @@ This is repository is for the paper:
     arXiv preprint arXiv:1912.01954
 
 The full paper is available at: [https://arxiv.org/abs/1912.01954](https://arxiv.org/abs/1912.01954). 
+But some optimizations have been applied to the codes now, beyond the paper.
 
 ## Installation
 This EmbedMask implementation is based on [FCOS](https://github.com/tianzhi0549/FCOS), which is also based on [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark). 
@@ -25,6 +26,14 @@ We do training and inference in the COCO dataset. If you want perform training a
 ## Pretrained Models
 
 The pretrained models can be downloaded from [here](https://1drv.ms/u/s!Al_gruIFwTUskAC9jf6oqkQ860of?e=u8j4AP). And you should place them in the 'models' directory.
+
+Here are the scores of these models on COCO 'test2014' set:
+
+| Model | AP |
+| :-----| ----: |
+| R50_1x | 34.7 |
+| R101_1x | 36.4 |
+| R101_ms_3x | 38.1 |
 
 ## Demo
 
