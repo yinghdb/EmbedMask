@@ -43,7 +43,7 @@ class ROIMaskHead(torch.nn.Module):
         self.post_processor = make_roi_mask_post_processor(cfg)
         self.loss_evaluator = make_roi_mask_loss_evaluator(cfg)
 
-    def forward(self, features, proposals, targets=None):
+    def forward(self, features, proposals, targets=None, benchmark=False, timers=None):
         """
         Arguments:
             features (list[Tensor]): feature-maps from possibly several levels
@@ -58,7 +58,9 @@ class ROIMaskHead(torch.nn.Module):
             losses (dict[Tensor]): During training, returns the losses for the
                 head. During testing, returns an empty dict.
         """
-
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[5].tic()
         if self.training:
             # during training, only focus on positive boxes
             all_proposals = proposals
@@ -69,9 +71,16 @@ class ROIMaskHead(torch.nn.Module):
         else:
             x = self.feature_extractor(features, proposals)
         mask_logits = self.predictor(x)
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[5].toc()
+            timers[6].tic()
 
         if not self.training:
             result = self.post_processor(mask_logits, proposals)
+            if benchmark and timers is not None:
+                torch.cuda.synchronize()
+                timers[6].toc()
             return x, result, {}
 
         loss_mask = self.loss_evaluator(proposals, mask_logits, targets)

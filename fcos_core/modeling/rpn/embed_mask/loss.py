@@ -63,7 +63,6 @@ class EmbedMaskLossComputation(object):
             [cfg.MODEL.EMBED_MASK.FPN_INTEREST_SPLIT[3], INF]
         ]
         self.sample_in_mask = cfg.MODEL.EMBED_MASK.SAMPLE_IN_MASK
-        self.sample_pos_iou_th = cfg.MODEL.EMBED_MASK.SAMPLE_POS_IOU_TH
 
         self.box_padding = cfg.MODEL.EMBED_MASK.BOX_PADDING
 
@@ -72,11 +71,9 @@ class EmbedMaskLossComputation(object):
         self.init_margin = -math.log(0.5) / (prior_margin ** 2)
 
         self.loss_mask_alpha = cfg.MODEL.EMBED_MASK.LOSS_MASK_ALPHA
-        self.loss_smooth_alpha = cfg.MODEL.EMBED_MASK.LOSS_SMOOTH_ALPHA
 
     def fresh_alphas(self, cfg):
         self.loss_mask_alpha = cfg.MODEL.EMBED_MASK.LOSS_MASK_ALPHA
-        self.loss_smooth_alpha = cfg.MODEL.EMBED_MASK.LOSS_SMOOTH_ALPHA
 
     def prepare_targets(self, points, targets, im_w, im_h):
         object_sizes_of_interest = self.object_sizes_of_interest
@@ -228,14 +225,13 @@ class EmbedMaskLossComputation(object):
         locations = torch.cat(locations, dim=0)
         pos_indexes_for_targets = []
         for im in range(len(targets)):
-            pos_indexes_for_targets_per_im = []
+            pos_indexes_for_targets_per_im = locations.new_ones(len(targets[im])).long() * -1
             box_regression_im = [box_regression[l][im].detach().view(4, -1).transpose(0, 1).contiguous() * self.fpn_strides[l] for l in
                                  range(len(box_regression))]
             box_regression_im = torch.cat(box_regression_im, dim=0)
             for t_id in range(len(targets[im])):
                 valid = matched_idxes[im] == t_id
                 if valid.sum() == 0:
-                    pos_indexes_for_targets_per_im.append(valid.new_tensor([]))
                     continue
                 valid_location = locations[valid]
                 valid_regression = box_regression_im[valid]
@@ -251,13 +247,10 @@ class EmbedMaskLossComputation(object):
 
                 pos_labels_per_target = torch.zeros_like(valid)
                 iou_in_target = match_quality_matrix[:, 0]
-                if iou_in_target.max() > self.sample_pos_iou_th:
-                    pos_in_target = (iou_in_target > self.sample_pos_iou_th)
-                else:
-                    pos_in_target = (iou_in_target == iou_in_target.max())
+                pos_in_target = (iou_in_target == iou_in_target.max())
                 pos_labels_per_target[valid] = pos_in_target
+                pos_indexes_for_targets_per_im[t_id] = pos_labels_per_target.nonzero()[0][0]
 
-                pos_indexes_for_targets_per_im.append(pos_labels_per_target.nonzero().squeeze(1))
             pos_indexes_for_targets.append(pos_indexes_for_targets_per_im)
 
         return pos_indexes_for_targets
@@ -267,16 +260,12 @@ class EmbedMaskLossComputation(object):
         features_flatten = torch.cat(
             [features_per_level.view(N, dim, -1) for features_per_level in features], dim=2
         ).transpose(1, 2).contiguous()
-        pos_features_for_targets = []
+        pos_features = []
+        pos_valids = []
         for im in range(N):
-            pos_features_for_targets_im = []
-            for t_id in range(len(poses[im])):
-                if len(poses[im][t_id]) == 0:
-                    pos_features_for_targets_im.append(features_flatten.new_tensor([]))
-                else:
-                    pos_features_for_targets_im.append(features_flatten[im][poses[im][t_id]])
-            pos_features_for_targets.append(pos_features_for_targets_im)
-        return pos_features_for_targets
+            pos_features.append(features_flatten[im][poses[im]])
+            pos_valids.append(poses[im] != -1)
+        return pos_features, pos_valids
 
     def calculate_means(self, features):
         means = []
@@ -402,32 +391,15 @@ class EmbedMaskLossComputation(object):
         pos_proposal_labels_for_targets = self.get_pos_proposal_indexes(locations, box_regression, matched_idxes, targets)
 
         # get positive samples of embeddings & margins for each gt instance
-        proposal_embed_for_targets = self.get_proposal_element(proposal_embed, pos_proposal_labels_for_targets)
-        proposal_margin_for_targets = self.get_proposal_element(proposal_margin, pos_proposal_labels_for_targets)
+        proposal_embed_for_targets, valids_for_targets = self.get_proposal_element(proposal_embed, pos_proposal_labels_for_targets)
+        proposal_margin_for_targets, _ = self.get_proposal_element(proposal_margin, pos_proposal_labels_for_targets)
 
-        # get proposal embedding & margin means
-        embedding_means = self.calculate_means(proposal_embed_for_targets)
-        margin_means = self.calculate_means(proposal_margin_for_targets)
-
-        ############ SMOOTH_LOSS ##############
-        smooth_loss = box_cls[0].new_tensor(0.0)
-        if self.loss_smooth_alpha > 0:
-            N = len(proposal_embed_for_targets)
-            for im in range(N):
-                target_num = len(proposal_embed_for_targets[im])
-                smooth_loss_im = box_cls[0].new_tensor(0.0)
-                for t_id in range(target_num):
-                    if len(embedding_means[im][t_id])>0:
-                        smooth_loss_im += torch.sum((proposal_embed_for_targets[im][t_id]-embedding_means[im][t_id])**2) + \
-                            torch.sum((proposal_margin_for_targets[im][t_id] - margin_means[im][t_id]) ** 2)
-                if target_num > 0:
-                    smooth_loss += (smooth_loss_im / target_num)
-            smooth_loss = smooth_loss / N * self.loss_smooth_alpha
         ######## MEANINGLESS_LOSS #######
+        mask_loss = box_cls[0].new_tensor(0.0)
         for i in range(len(proposal_embed)):
-            smooth_loss += 0 * proposal_embed[i].sum()
-            smooth_loss += 0 * proposal_margin[i].sum()
-        smooth_loss += 0 * pixel_embed.sum()
+            mask_loss += 0 * proposal_embed[i].sum()
+            mask_loss += 0 * proposal_margin[i].sum()
+        mask_loss += 0 * pixel_embed.sum()
         ############ Mask Losses ##############
         # get target masks in prefer size
         N, _, m_h, m_w = pixel_embed.shape
@@ -440,32 +412,27 @@ class EmbedMaskLossComputation(object):
         masks_t = self.prepare_masks(o_h, o_w, r_h, r_w, targets_masks)
         pixel_embed = interpolate(input=pixel_embed, size=(o_h, o_w), mode="bilinear", align_corners=False)
 
-        mask_loss = box_cls[0].new_tensor(0.0)
-        proposal_embed_samples = embedding_means
-        proposal_margin_samples = margin_means
         if self.loss_mask_alpha > 0:
             for im in range(N):
-                mask_loss_im = box_cls[0].new_tensor(0.0)
-                target_num = len(proposal_embed_for_targets[im])
-                for t_id in range(target_num):
-                    if len(proposal_embed_samples[im][t_id]) == 0:
-                        continue
-                    masks_prob = self.compute_mask_prob(proposal_embed_samples[im][t_id],
-                                                        proposal_margin_samples[im][t_id],
-                                                        pixel_embed[im])
-                    sample_num = len(masks_prob)
-                    masks_t_id = masks_t[im][t_id]
-                    boxes_t_id = targets[im].bbox[t_id] / stride
-                    masks_prob_crop, crop_mask = crop_by_box(masks_prob, boxes_t_id, self.box_padding)
-                    mask_loss_per_target = self.mask_loss_func(masks_prob_crop, masks_t_id.unsqueeze(0).expand(sample_num, -1, -1).float(),
-                                                               mask=crop_mask, act=True)
+                valid = valids_for_targets[im]
+                if valid.sum() == 0:
+                    continue
+                proposal_embed_im = proposal_embed_for_targets[im][valid]
+                proposal_margin_im = proposal_margin_for_targets[im][valid]
+                masks_t_im = masks_t[im][valid]
+                boxes_t_im = targets[im].bbox[valid] / stride
 
-                    mask_loss_im += mask_loss_per_target.mean()
-                if target_num > 0:
-                    mask_loss += mask_loss_im / target_num
+                masks_prob = self.compute_mask_prob(proposal_embed_im,
+                                                    proposal_margin_im,
+                                                    pixel_embed[im])
+                masks_prob_crop, crop_mask = crop_by_box(masks_prob, boxes_t_im, self.box_padding)
+                mask_loss_per_target = self.mask_loss_func(masks_prob_crop, masks_t_im, mask=crop_mask, act=True)
+
+                mask_loss += mask_loss_per_target.mean()
+
             mask_loss = mask_loss / N * self.loss_mask_alpha
 
-        return cls_loss, reg_loss, centerness_loss, mask_loss, smooth_loss
+        return cls_loss, reg_loss, centerness_loss, mask_loss
 
     def compute_centerness_targets(self, reg_targets):
         left_right = reg_targets[:, [0, 2]]

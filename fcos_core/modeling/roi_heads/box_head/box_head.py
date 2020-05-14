@@ -21,7 +21,7 @@ class ROIBoxHead(torch.nn.Module):
         self.post_processor = make_roi_box_post_processor(cfg)
         self.loss_evaluator = make_roi_box_loss_evaluator(cfg)
 
-    def forward(self, features, proposals, targets=None):
+    def forward(self, features, proposals, targets=None, benchmark=False, timers=None):
         """
         Arguments:
             features (list[Tensor]): feature-maps from possibly several levels
@@ -42,14 +42,24 @@ class ROIBoxHead(torch.nn.Module):
             with torch.no_grad():
                 proposals = self.loss_evaluator.subsample(proposals, targets)
 
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[3].tic()
         # extract features that will be fed to the final classifier. The
         # feature_extractor generally corresponds to the pooler + heads
         x = self.feature_extractor(features, proposals)
         # final classifier that converts the features into predictions
         class_logits, box_regression = self.predictor(x)
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[3].toc()
+            timers[4].tic()
 
         if not self.training:
             result = self.post_processor((class_logits, box_regression), proposals)
+            if benchmark and timers is not None:
+                torch.cuda.synchronize()
+                timers[4].toc()
             return x, result, {}
 
         loss_classifier, loss_box_reg = self.loss_evaluator(

@@ -138,7 +138,7 @@ class RPNModule(torch.nn.Module):
         self.box_selector_test = box_selector_test
         self.loss_evaluator = loss_evaluator
 
-    def forward(self, images, features, targets=None):
+    def forward(self, images, features, targets=None, benchmark=None, timers=None):
         """
         Arguments:
             images (ImageList): images for which we want to compute the predictions
@@ -153,13 +153,19 @@ class RPNModule(torch.nn.Module):
             losses (dict[Tensor]): the losses for the model during training. During
                 testing, it is an empty dict.
         """
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[1].tic()
         objectness, rpn_box_regression = self.head(features)
         anchors = self.anchor_generator(images, features)
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[1].toc()
 
         if self.training:
             return self._forward_train(anchors, objectness, rpn_box_regression, targets)
         else:
-            return self._forward_test(anchors, objectness, rpn_box_regression)
+            return self._forward_test(anchors, objectness, rpn_box_regression, benchmark, timers)
 
     def _forward_train(self, anchors, objectness, rpn_box_regression, targets):
         if self.cfg.MODEL.RPN_ONLY:
@@ -184,8 +190,14 @@ class RPNModule(torch.nn.Module):
         }
         return boxes, losses
 
-    def _forward_test(self, anchors, objectness, rpn_box_regression):
+    def _forward_test(self, anchors, objectness, rpn_box_regression, benchmark=None, timers=None):
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[2].tic()
         boxes = self.box_selector_test(anchors, objectness, rpn_box_regression)
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[2].toc()
         if self.cfg.MODEL.RPN_ONLY:
             # For end-to-end models, the RPN proposals are an intermediate state
             # and don't bother to sort them in decreasing score order. For RPN-only

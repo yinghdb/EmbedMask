@@ -33,7 +33,7 @@ class GeneralizedRCNN(nn.Module):
     def fresh_alpha(self, cfg):
         self.rpn.fresh_alpha(cfg)
 
-    def forward(self, images, targets=None):
+    def forward(self, images, targets=None, benchmark=False, timers=None):
         """
         Arguments:
             images (list[Tensor] or ImageList): images to be processed
@@ -46,13 +46,18 @@ class GeneralizedRCNN(nn.Module):
                 like `scores`, `labels` and `mask` (for Mask R-CNN models).
 
         """
+        if benchmark and timers is not None:
+            timers[0].tic()
         if self.training and targets is None:
             raise ValueError("In training mode, targets should be passed")
         images = to_image_list(images)
         features = self.backbone(images.tensors)
-        proposals, proposal_losses = self.rpn(images, features, targets)
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[0].toc()
+        proposals, proposal_losses = self.rpn(images, features, targets, benchmark=benchmark, timers=timers)
         if self.roi_heads:
-            x, result, detector_losses = self.roi_heads(features, proposals, targets)
+            x, result, detector_losses = self.roi_heads(features, proposals, targets, benchmark=benchmark, timers=timers)
         else:
             # RPN-only models don't have roi_heads
             x = features

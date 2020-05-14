@@ -59,8 +59,9 @@ class LovaszHinge(nn.Module):
                 input_flatten, target_flatten = self.flatten(inputs[id], targets[id], mask[id])
             else:
                 input_flatten, target_flatten = self.flatten(inputs[id], targets[id])
-            if act:
-                # map [0, 1] to [-inf, inf]
+            if act: 
+                MIN = 1e-9
+                input_flatten = torch.clamp(input_flatten, min=MIN, max=1-MIN)
                 input_flatten = torch.log(input_flatten) - torch.log(1 - input_flatten)
             losses.append(self.lovasz_hinge_flat(input_flatten, target_flatten))
         losses = torch.stack(losses).to(device=inputs.device)

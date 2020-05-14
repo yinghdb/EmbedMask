@@ -212,7 +212,7 @@ class EmbedMaskPostProcessor(torch.nn.Module):
 
         return new_boxlists
 
-    def forward(self, locations, box_cls, box_regression, centerness, proposal_embed, proposal_margin, pixel_embed, image_sizes, targets):
+    def forward(self, locations, box_cls, box_regression, centerness, proposal_embed, proposal_margin, pixel_embed, image_sizes, targets, benchmark, timers):
         """
         Arguments:
             anchors: list[list[BoxList]]
@@ -223,6 +223,9 @@ class EmbedMaskPostProcessor(torch.nn.Module):
             boxlists (list[BoxList]): the post-processed anchors, after
                 applying box decoding and NMS
         """
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[4].tic()
         sampled_boxes = []
         for i, (l, o, b, c) in enumerate(zip(locations, box_cls, box_regression, centerness)):
             em = proposal_embed[i]
@@ -234,9 +237,17 @@ class EmbedMaskPostProcessor(torch.nn.Module):
                     l, o, b, c, em, mar, image_sizes, i
                 )
             )
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[4].toc()
+            timers[5].tic()
         boxlists = list(zip(*sampled_boxes))
         boxlists = [cat_boxlist(boxlist) for boxlist in boxlists]
         boxlists = self.select_over_all_levels(boxlists)
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[5].toc()
+            timers[6].tic()
 
         # resize pixel embedding for higher resolution
         N, dim, m_h, m_w = pixel_embed.shape
@@ -245,6 +256,10 @@ class EmbedMaskPostProcessor(torch.nn.Module):
         pixel_embed = interpolate(pixel_embed, size=(o_h, o_w), mode='bilinear', align_corners=False)
 
         boxlists = self.forward_for_mask(boxlists, pixel_embed)
+
+        if benchmark and timers is not None:
+            torch.cuda.synchronize()
+            timers[6].toc()
 
         return boxlists
 

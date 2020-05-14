@@ -150,6 +150,7 @@ class FCOSModule(torch.nn.Module):
                 testing, it is an empty dict.
         """
         if benchmark and timers is not None:
+            torch.cuda.synchronize()
             timers[1].tic()
         box_cls, box_regression, centerness = self.head(features)
         locations = self.compute_locations(features)

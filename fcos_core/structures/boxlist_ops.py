@@ -265,20 +265,20 @@ def boxes_to_masks(boxes, h, w, padding = 0.0):
 def crop_by_box(masks, box, padding = 0.0):
     n, h, w = masks.size()
 
-    b_w = box[2] - box[0]
-    b_h = box[3] - box[1]
-    x1 = torch.clamp(box[0:1] - b_w * padding - 1, min=0)
-    x2 = torch.clamp(box[2:3] + b_w * padding + 1, max=w-1)
-    y1 = torch.clamp(box[1:2] - b_h * padding - 1, min=0)
-    y2 = torch.clamp(box[3:4] + b_h * padding + 1, max=h-1)
+    b_w = box[:, 2] - box[:, 0]
+    b_h = box[:, 3] - box[:, 1]
+    x1 = torch.clamp(box[:, 0] - b_w * padding - 1, min=0)
+    x2 = torch.clamp(box[:, 2] + b_w * padding + 1, max=w-1)
+    y1 = torch.clamp(box[:, 1] - b_h * padding - 1, min=0)
+    y2 = torch.clamp(box[:, 3] + b_h * padding + 1, max=h-1)
 
     rows = torch.arange(w, device=masks.device, dtype=x1.dtype).view(1, 1, -1).expand(n, h, w)
     cols = torch.arange(h, device=masks.device, dtype=x1.dtype).view(1, -1, 1).expand(n, h, w)
 
-    masks_left = rows >= x1.expand(n, 1, 1)
-    masks_right = rows < x2.expand(n, 1, 1)
-    masks_up = cols >= y1.expand(n, 1, 1)
-    masks_down = cols < y2.expand(n, 1, 1)
+    masks_left = rows >= x1.view(n, 1, 1)
+    masks_right = rows < x2.view(n, 1, 1)
+    masks_up = cols >= y1.view(n, 1, 1)
+    masks_down = cols < y2.view(n, 1, 1)
 
     crop_mask = masks_left * masks_right * masks_up * masks_down
     return masks * crop_mask.float(), crop_mask

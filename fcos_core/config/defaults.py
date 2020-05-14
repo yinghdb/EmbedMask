@@ -61,11 +61,10 @@ _C.MODEL.EMBED_MASK.IOU_LOSS_TYPE = "giou"
 _C.MODEL.EMBED_MASK.CENTER_ON = True
 _C.MODEL.EMBED_MASK.CENTER_POS_RADIOS = 1.5
 #------Embedding Options-------#
-_C.MODEL.EMBED_MASK.EMBED_DIM = 32
+_C.MODEL.EMBED_MASK.EMBED_DIM = 8
 
 # box mask select related settings
 _C.MODEL.EMBED_MASK.SAMPLE_IN_MASK = True
-_C.MODEL.EMBED_MASK.SAMPLE_POS_IOU_TH = 0.5
 _C.MODEL.EMBED_MASK.FIX_MARGIN = False
 
 _C.MODEL.EMBED_MASK.BOX_PADDING = 0.0
@@ -73,17 +72,12 @@ _C.MODEL.EMBED_MASK.BOX_PADDING = 0.0
 _C.MODEL.EMBED_MASK.PRIOR_MARGIN = 2.0
 
 _C.MODEL.EMBED_MASK.LOSS_MASK_ALPHA = 0.5
-_C.MODEL.EMBED_MASK.LOSS_SMOOTH_ALPHA = 0.1
 
 _C.MODEL.EMBED_MASK.MASK_SCALE_FACTOR = 2
 _C.MODEL.EMBED_MASK.MASK_NUM_CONVS = 4
-# when input box to predict margin, the box should be scaled. if the scale equals to -1, means use the shorter side length
-_C.MODEL.EMBED_MASK.BOX_TO_MARGIN_SCALE = 800
-# blocking the gradient from box to margin may bring better performance
-_C.MODEL.EMBED_MASK.BOX_TO_MARGIN_BLOCK = True
 
 # inference settings
-_C.MODEL.EMBED_MASK.MASK_TH = 0.5
+_C.MODEL.EMBED_MASK.MASK_TH = 0.53
 _C.MODEL.EMBED_MASK.POSTPROCESS_MASKS = False
 
 # -----------------------------------------------------------------------------

@@ -124,6 +124,7 @@ class FCOSPostProcessor(torch.nn.Module):
                 applying box decoding and NMS
         """
         if benchmark and timers is not None:
+            torch.cuda.synchronize()
             timers[2].tic()
         sampled_boxes = []
         for _, (l, o, b, c) in enumerate(zip(locations, box_cls, box_regression, centerness)):

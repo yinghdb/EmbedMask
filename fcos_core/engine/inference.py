@@ -14,7 +14,7 @@ from ..utils.comm import synchronize
 from ..utils.timer import Timer, get_time_str
 from .bbox_aug import im_detect_bbox_aug
 
-def compute_on_dataset(model, data_loader, device, timer=None, start_iter=0, break_iter=0, speed_only=False):
+def compute_on_dataset(model, data_loader, device, timer=None, start_iter=0, break_iter=0, speed_only=False, benchmark=False, timers=None):
     model.eval()
     results_dict = {}
     cpu_device = torch.device("cpu")
@@ -33,11 +33,11 @@ def compute_on_dataset(model, data_loader, device, timer=None, start_iter=0, bre
             if cfg.TEST.BBOX_AUG.ENABLED:
                 output = im_detect_bbox_aug(model, images, device)
             else:
-                output = model(images.to(device))
+                output = model(images.to(device), benchmark=benchmark, timers=timers)
             if timer:
                 torch.cuda.synchronize()
                 timer.toc()
-        if not speed_only:
+        if not (speed_only or benchmark):
             output = [o.to(cpu_device) for o in output]
             results_dict.update(
                 {img_id: result for img_id, result in zip(image_ids, output)}
@@ -81,6 +81,7 @@ def inference(
         start_iter=0,
         break_iter=0,
         speed_only=False,
+        benchmark=False,
         cfg=None,
 ):
     # convert to a torch.device for efficiency
@@ -93,9 +94,14 @@ def inference(
     inference_timer = Timer()
     if break_iter == 0:
         break_iter = len(dataset)
+    if benchmark:
+        timers = [Timer() for i in range(11)]
+    else: 
+        timers = None
     total_timer.tic()
     predictions = compute_on_dataset(model, data_loader, device, inference_timer,
-                                     start_iter=start_iter, break_iter=break_iter, speed_only=speed_only)
+                                     start_iter=start_iter, break_iter=break_iter, 
+                                     speed_only=speed_only, benchmark=benchmark, timers=timers)
     # wait for all processes to complete before measuring the time
     synchronize()
     total_time = total_timer.toc()
@@ -114,8 +120,14 @@ def inference(
             num_devices,
         )
     )
-
-    if speed_only:
+    if benchmark:
+        for i in range(len(timers)):
+            logger.info("timer {}: {} s)".format(
+                i, timers[i].total_time * num_devices / (break_iter - start_iter), )
+            )
+        return
+        
+    if speed_only or benchmark:
         return
 
     predictions = _accumulate_predictions_from_multiple_gpus(predictions)
