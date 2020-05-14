@@ -11,17 +11,14 @@ MODEL:
   RETINANET:
     USE_C5: False # FCOS uses P5 instead of C5
   EMBED_MASK:
-    EMBED_DIM: 32
+    EMBED_DIM: 8
     SAMPLE_IN_MASK: True
-    SAMPLE_POS_IOU_TH: 0.5
     FIX_MARGIN: False
     BOX_PADDING: 0.1
     PRIOR_MARGIN: 2.0
     LOSS_MASK_ALPHA: 0.5
-    LOSS_SMOOTH_ALPHA: 0.1
     MASK_SCALE_FACTOR: 2
     MASK_NUM_CONVS: 4
-    BOX_TO_MARGIN_BLOCK: True
 DATASETS:
   TRAIN: ("coco_2014_train", "coco_2014_valminusminival")
   # TEST: ("coco_2017_test_dev",)
