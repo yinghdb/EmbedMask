@@ -298,16 +298,18 @@ class EmbedMaskLossComputation(object):
         return masks
 
     def compute_mask_prob(self, proposal_embed, proposal_margin, pixel_embed):
-        m_h, m_w = pixel_embed.shape[-2:]
+        dim, m_h, m_w = pixel_embed.shape[-3:]
         obj_num = proposal_embed.shape[0]
         pixel_embed = pixel_embed.permute(1, 2, 0).unsqueeze(0).expand(obj_num, -1, -1, -1)
         proposal_embed = proposal_embed.view(obj_num, 1, 1, -1).expand(-1, m_h, m_w, -1)
         if self.fix_margin:
-            proposal_margin = proposal_margin.new_ones(obj_num, m_h, m_w) * self.init_margin
+            proposal_margin = proposal_margin.new_ones(obj_num, m_h, m_w, dim) * self.init_margin
+            mask_var = (pixel_embed - proposal_embed) ** 2
+            mask_prob = torch.exp(-torch.sum(mask_var * proposal_margin, dim=3))
         else:
-            proposal_margin = proposal_margin.view(obj_num, 1, 1).expand(-1, m_h, m_w)
-        mask_var = torch.sum((pixel_embed - proposal_embed) ** 2, dim=3)
-        mask_prob = torch.exp(-mask_var*proposal_margin)
+            proposal_margin = proposal_margin.view(obj_num, 1, 1, dim).expand(-1, m_h, m_w, -1)
+            mask_var = (pixel_embed - proposal_embed) ** 2
+            mask_prob = torch.exp(-torch.sum(mask_var * proposal_margin, dim=3))
 
         return mask_prob
 
@@ -425,8 +427,11 @@ class EmbedMaskLossComputation(object):
                 masks_prob = self.compute_mask_prob(proposal_embed_im,
                                                     proposal_margin_im,
                                                     pixel_embed[im])
-                masks_prob_crop, crop_mask = crop_by_box(masks_prob, boxes_t_im, self.box_padding)
-                mask_loss_per_target = self.mask_loss_func(masks_prob_crop, masks_t_im, mask=crop_mask, act=True)
+                if self.box_padding >= 0:
+                    masks_prob_crop, crop_mask = crop_by_box(masks_prob, boxes_t_im, self.box_padding)
+                    mask_loss_per_target = self.mask_loss_func(masks_prob_crop, masks_t_im, mask=crop_mask, act=True)
+                else:
+                    mask_loss_per_target = self.mask_loss_func(masks_prob, masks_t_im, act=True)
 
                 mask_loss += mask_loss_per_target.mean()
 

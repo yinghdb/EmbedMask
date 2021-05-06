@@ -1,0 +1,6 @@
+DATA:
+  DATASET_PATH: "./LMDB/Cars_train8k"
+MODEL:
+  K: 8
+OUT:
+  MODEL: 

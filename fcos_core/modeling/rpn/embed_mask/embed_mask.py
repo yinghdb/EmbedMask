@@ -16,7 +16,7 @@ class EmbedMaskHead(torch.nn.Module):
             in_channels (int): number of channels of the input feature
         """
         super(EmbedMaskHead, self).__init__()
-        # TODO: Implement the sigmoid version first.
+
         self.fpn_strides = cfg.MODEL.EMBED_MASK.FPN_STRIDES
         self.norm_reg_targets = cfg.MODEL.EMBED_MASK.NORM_REG_TARGETS
         self.centerness_on_reg = cfg.MODEL.EMBED_MASK.CENTERNESS_ON_REG
@@ -25,6 +25,11 @@ class EmbedMaskHead(torch.nn.Module):
         num_classes = cfg.MODEL.EMBED_MASK.NUM_CLASSES - 1
         embed_dim = cfg.MODEL.EMBED_MASK.EMBED_DIM
         prior_margin = cfg.MODEL.EMBED_MASK.PRIOR_MARGIN
+        self.margin_reduce_factor = cfg.MODEL.EMBED_MASK.MARGIN_REDUCE_FACTOR
+        self.embed_reduce_factor = cfg.MODEL.EMBED_MASK.EMBED_REDUCE_FACTOR
+
+        margin_num = embed_dim
+
         self.init_sigma_bias = math.log(-math.log(0.5) / (prior_margin ** 2))
 
         cls_tower = []
@@ -117,12 +122,15 @@ class EmbedMaskHead(torch.nn.Module):
                 if isinstance(l, nn.Conv2d):
                     torch.nn.init.normal_(l.weight, std=0.01)
                     torch.nn.init.constant_(l.bias, 0)
+
         # proposal margin
         self.proposal_margin_pred = nn.Conv2d(
-            in_channels, 1, kernel_size=3, stride=1, padding=1, bias=True
+            in_channels, margin_num, kernel_size=3, stride=1, padding=1, bias=True
         )
         torch.nn.init.normal_(self.proposal_margin_pred.weight, std=0.01)
         torch.nn.init.constant_(self.proposal_margin_pred.bias, self.init_sigma_bias)
+
+        self.margin_scales = nn.ModuleList([Scale(init_value=1.0) for _ in range(5)])
 
         # pixel embedding
         self.add_module('mask_tower', nn.Sequential(*mask_tower))
@@ -137,8 +145,8 @@ class EmbedMaskHead(torch.nn.Module):
                 if isinstance(l, nn.Conv2d):
                     torch.nn.init.normal_(l.weight, std=0.01)
                     torch.nn.init.constant_(l.bias, 0)
-
         self.position_scale = Scale(init_value=1.0)
+
         
     def forward(self, x, locations, benchmark=False, timers=None):
         logits = []
@@ -170,7 +178,7 @@ class EmbedMaskHead(torch.nn.Module):
                 bbox_reg.append(torch.exp(bbox_pred))
 
             # ############### Mask Prediction ###########
-            embed_x = box_tower
+            embed_x = box_tower / self.embed_reduce_factor
 
             h, w = embed_x.size()[-2:]
             proposal_spatial_embd = self.proposal_spatial_embed_pred(embed_x)
@@ -180,8 +188,16 @@ class EmbedMaskHead(torch.nn.Module):
             proposal_spatial_embd = scaled_coordinates + proposal_spatial_embd
             proposal_embed.append(torch.cat([proposal_spatial_embd, proposal_other_embd], dim=1))
 
-            margin_x = box_tower / 32
-            proposal_margin.append(torch.exp(self.proposal_margin_pred(margin_x)))
+            margin_x = box_tower / self.margin_reduce_factor
+
+
+            proposal_margin_res = self.proposal_margin_pred(margin_x)
+            proposal_margin_res_spatial = proposal_margin_res[:, :2, :, :]
+            proposal_margin_res_spatial = self.margin_scales[l](proposal_margin_res_spatial)
+            proposal_margin_res = torch.cat([proposal_margin_res_spatial, proposal_margin_res[:, 2:, :, :]], dim=1)
+            proposal_margin_res = torch.exp(proposal_margin_res) 
+
+            proposal_margin.append(proposal_margin_res)
 
         if benchmark and timers is not None:
             torch.cuda.synchronize()
@@ -189,7 +205,7 @@ class EmbedMaskHead(torch.nn.Module):
             timers[3].tic()
         # pixel embedding
         mask_x = x[0]
-        mask_x = self.mask_tower(mask_x)
+        mask_x = self.mask_tower(mask_x) / self.embed_reduce_factor
 
         h, w = mask_x.size()[-2:]
         pixel_spatial_embd = self.pixel_spatial_embed_pred(mask_x)
@@ -204,6 +220,17 @@ class EmbedMaskHead(torch.nn.Module):
             timers[3].toc()
 
         return logits, bbox_reg, centerness, proposal_embed, proposal_margin, pixel_embed
+
+    def build_position_embed(self, locations, dim, h, w):
+        position_embed = torch.zeros([dim, h, w], device=locations.device)
+        for i in range(dim // 2):
+            position = locations[:, 0].view(h, w)
+            base_x = position / (torch.pow(torch.tensor(10000), 2 * i / dim))
+            position_embed[2*i] = torch.sin(base_x)
+            position = locations[:, 1].view(h, w)
+            base_y = position / (torch.pow(torch.tensor(10000), 2 * i / dim))
+            position_embed[2*i + 1] = torch.sin(base_y)
+        return position_embed
 
 class EmbedMaskModule(torch.nn.Module):
     """

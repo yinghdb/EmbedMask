@@ -50,8 +50,10 @@ class EmbedMaskPostProcessor(torch.nn.Module):
 
         self.mask_scale_factor = cfg.MODEL.EMBED_MASK.MASK_SCALE_FACTOR
         self.fpn_strides = cfg.MODEL.EMBED_MASK.FPN_STRIDES
-        self.mask_th = cfg.MODEL.EMBED_MASK.MASK_TH
+        self.mask_th = math.log(cfg.MODEL.EMBED_MASK.MASK_TH)
+        # self.mask_th = cfg.MODEL.EMBED_MASK.MASK_TH
         self.post_process_masks = cfg.MODEL.EMBED_MASK.POSTPROCESS_MASKS
+        self.keep_embed = cfg.MODEL.EMBED_MASK.KEEP_EMBED
 
         self.object_sizes_of_interest = [
             [-1, cfg.MODEL.EMBED_MASK.FPN_INTEREST_SPLIT[0]],
@@ -86,8 +88,8 @@ class EmbedMaskPostProcessor(torch.nn.Module):
         centerness = centerness.reshape(N, -1).sigmoid()
         proposal_embed = proposal_embed.view(N, -1, H, W).permute(0, 2, 3, 1)
         proposal_embed = proposal_embed.reshape(N, H*W, -1)
-        proposal_margin = proposal_margin.view(N, 1, H, W).permute(0, 2, 3, 1)
-        proposal_margin = proposal_margin.reshape(N, -1)
+        proposal_margin = proposal_margin.view(N, -1, H, W).permute(0, 2, 3, 1)
+        proposal_margin = proposal_margin.reshape(N, H*W, -1)
 
         candidate_inds = box_cls > self.pre_nms_thresh
         pre_nms_top_n = candidate_inds.view(N, -1).sum(1)
@@ -187,10 +189,9 @@ class EmbedMaskPostProcessor(torch.nn.Module):
                 continue
 
             mask_boxes = boxes / stride
-            box_masks = boxes_to_masks(mask_boxes, m_h, m_w)
             proposal_margin = boxlist.get_field('proposal_margin')
             mask_prob = self.compute_mask_prob(pixel_embed[im], proposal_embed, proposal_margin, mask_boxes)
-            masks = mask_prob * box_masks.float()
+            masks = mask_prob
 
             if self.post_process_masks:
                 masks = torch.nn.functional.interpolate(input=masks.unsqueeze(1).float(), scale_factor=stride,
@@ -207,6 +208,10 @@ class EmbedMaskPostProcessor(torch.nn.Module):
             else:
                 new_boxlist.add_field('stride', torch.tensor(stride))
                 new_boxlist.add_field('mask_th', torch.tensor(self.mask_th))
+            if self.keep_embed:
+                new_boxlist.add_field('proposal_embed', proposal_embed)
+                new_boxlist.add_field('pixel_embed', pixel_embed[im])
+                new_boxlist.add_field('proposal_margin', proposal_margin)
 
             new_boxlists.append(new_boxlist)
 

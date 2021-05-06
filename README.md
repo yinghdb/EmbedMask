@@ -7,7 +7,6 @@ This is repository is for the paper:
     arXiv preprint arXiv:1912.01954
 
 The full paper is available at: [https://arxiv.org/abs/1912.01954](https://arxiv.org/abs/1912.01954). 
-But some optimizations have been applied to the codes now, beyond the paper.
 
 ## Installation
 This EmbedMask implementation is based on [FCOS](https://github.com/tianzhi0549/FCOS), which is also based on [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark). 
@@ -25,22 +24,14 @@ We do training and inference in the COCO dataset. If you want perform training a
 
 ## Pretrained Models
 
-The pretrained models can be downloaded from [here](https://1drv.ms/u/s!Al_gruIFwTUskAC9jf6oqkQ860of?e=u8j4AP). And you should place them in the 'models' directory.
-
-Here are the scores of these models on COCO 'test2014' set:
-
-| Model | AP |
-| :-----| ----: |
-| R50_1x | 34.7 |
-| R101_1x | 36.4 |
-| R101_ms_3x | 38.1 |
+The pretrained models can be downloaded from [here](https://1drv.ms/u/s!Al_gruIFwTUskAC9jf6oqkQ860of?e=3fHO6a). And you should place them in the 'models' directory.
 
 ## Demo
 
 Once you have finished the installation and downloaded the pretrained models, you can run a quick demo by the following instructions which use the settings and from 'embed_mask_R50_1x'.
     
     # assume that you are under the root directory of this project,
-    mkdir -p demo/ouput
+    mkdir -p demo/output
     python demo/embed_mask_demo.py \
         --config-file configs/embed_mask/embed_mask_R50_1x.yaml \
         --weights models/embed_mask_R50_1x.pth
@@ -50,10 +41,12 @@ Once you have finished the installation and downloaded the pretrained models, yo
 
 The following inference command line run inference on coco minival split:
 
+    CUDA_VISIBLE_DEVICES=0 \
     python tools/test_net.py \
         --config-file configs/embed_mask/embed_mask_R50_1x.yaml \
         MODEL.WEIGHT models/embed_mask_R50_1x.pth \
-        TEST.IMS_PER_BATCH 4
+        TEST.IMS_PER_BATCH 4 \
+        OUTPUT_DIR "./Results/R50-ConvAdd"
 
 ## Speed Testing
 
@@ -70,13 +63,14 @@ The following inference command line run speed testing on coco minival split:
 
 The following command line will train 'embed_mask_R50_1x' on 4 GPUs with batchsize 16:
 
+    CUDA_VISIBLE_DEVICES=0,2 \
     python -m torch.distributed.launch \
-        --nproc_per_node=4 \
+        --nproc_per_node=2 \
         --master_port=$((RANDOM + 10000)) \
         tools/train_net.py \
         --config-file configs/embed_mask/embed_mask_R50_1x.yaml \
         DATALOADER.NUM_WORKERS 4 \
-        SOLVER.IMS_PER_BATCH 16 \
+        SOLVER.IMS_PER_BATCH 8 \
         OUTPUT_DIR training_dir/embed_mask_R50_1x
 
 ## Citations

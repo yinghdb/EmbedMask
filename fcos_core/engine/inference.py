@@ -83,6 +83,7 @@ def inference(
         speed_only=False,
         benchmark=False,
         cfg=None,
+        multi_test=False
 ):
     # convert to a torch.device for efficiency
     device = torch.device(device)
@@ -143,7 +144,23 @@ def inference(
         expected_results=expected_results,
         expected_results_sigma_tol=expected_results_sigma_tol,
     )
-    return evaluate(dataset=dataset,
-                    predictions=predictions,
-                    output_folder=output_folder,
-                    **extra_args)
+
+    if multi_test:
+        margin = 0.45
+        for i in range(10):
+            print("########################################################")
+            print("########################################################")
+            print("margin %f\n" % (margin))
+            for i in range(len(predictions)):
+                predictions[i].add_field('mask_th', torch.tensor(margin))
+            evaluate(dataset=dataset,
+                     predictions=predictions,
+                     output_folder=output_folder,
+                     **extra_args)
+            margin = margin + 0.01
+        return
+    else:
+        return evaluate(dataset=dataset,
+                        predictions=predictions,
+                        output_folder=output_folder,
+                        **extra_args)

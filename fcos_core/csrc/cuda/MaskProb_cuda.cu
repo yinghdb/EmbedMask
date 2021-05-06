@@ -45,17 +45,19 @@ __global__ void MaskProbForward(
 
   const float* p_ep = embed_pixel + pixel_id*dim;
   const float* p_ec = embed_center + center_id*dim;
+  const float* p_sc = sigma_center + center_id*dim;
   float norm2 = 0.0;
 
   for (int d = 0; d < dim; ++d){
-    norm2 = norm2 + (*p_ep - *p_ec) * (*p_ep - *p_ec);
+    norm2 = norm2 - (*p_ep - *p_ec) * (*p_ep - *p_ec) * (*p_sc);
     p_ep++;
     p_ec++;
+    p_sc++;
   }
 
-  float p = expf(-norm2*sigma_center[center_id]);
+  float p = norm2;
   probs[center_id*num_pixel+pixel_id] = p;
-} 
+}
 
 at::Tensor MaskProb_forward_cuda(
   const at::Tensor& embed_pixel,
@@ -70,7 +72,7 @@ at::Tensor MaskProb_forward_cuda(
   AT_ASSERTM(sigma_center.type().is_cuda(), "sigma_center must be a CUDA tensor");
   AT_ASSERTM(embed_pixel.dim() == 2, "embed_pixel should be MxDim");
   AT_ASSERTM(embed_center.dim() == 2, "embed_center should be NxDim");
-  AT_ASSERTM(sigma_center.dim() == 1, "sigma_center should be N");
+  AT_ASSERTM(sigma_center.dim() == 2, "sigma_center should be NxDim");
   AT_ASSERTM(embed_pixel.size(1) == embed_center.size(1), "Dim should the same");
   AT_ASSERTM(embed_center.size(0) == sigma_center.size(0), "center number should be the same");
   AT_ASSERTM(embed_center.size(0) == boxes.size(0), "center number and box number should be the same");
@@ -79,7 +81,7 @@ at::Tensor MaskProb_forward_cuda(
   const int num_center = embed_center.size(0);
   const int dim = embed_pixel.size(1);
 
-  auto prob = at::empty({num_pixel, num_center}, embed_pixel.options());
+  auto prob = at::ones({num_pixel, num_center}, embed_pixel.options()) * -10.0;
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
   dim3 blocks(THCCeilDiv((long)area_sum, 512L));
