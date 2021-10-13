@@ -1,12 +1,9 @@
 # EmbedMask: Embedding Coupling for One-stage Instance Segmentation
 
-This is repository is for the paper:
+This is repository is for the paper: EmbedMask: Embedding Coupling for One-stage Instance Segmentation;
 
-    EmbedMask: Embedding Coupling for One-stage Instance Segmentation;
-    Hui Ying, Zhaojin Huang, Shu Liu, Tianjia Shao and Kun Zhou;
-    arXiv preprint arXiv:1912.01954
 
-The full paper is available at: [https://arxiv.org/abs/1912.01954](https://arxiv.org/abs/1912.01954). 
+The full paper is available at: [https://www.ijcai.org/proceedings/2021/0175.pdf](https://www.ijcai.org/proceedings/2021/0175.pdf). 
 
 ## Installation
 This EmbedMask implementation is based on [FCOS](https://github.com/tianzhi0549/FCOS), which is also based on [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark). 
@@ -76,12 +73,19 @@ The following command line will train 'embed_mask_R50_1x' on 4 GPUs with batchsi
 ## Citations
 Please consider citing our paper in your publications if the project helps your research. BibTeX reference is as follows.
 ```
-@misc{ying2019embedmask,
-    title={EmbedMask: Embedding Coupling for One-stage Instance Segmentation},
-    author={Hui Ying and Zhaojin Huang and Shu Liu and Tianjia Shao and Kun Zhou},
-    year={2019},
-    eprint={1912.01954},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
+@inproceedings{ijcai2021-175,
+  title     = {EmbedMask: Embedding Coupling for Instance Segmentation},
+  author    = {Ying, Hui and Huang, Zhaojin and Liu, Shu and Shao, Tianjia and Zhou, Kun},
+  booktitle = {Proceedings of the Thirtieth International Joint Conference on
+               Artificial Intelligence, {IJCAI-21}},
+  publisher = {International Joint Conferences on Artificial Intelligence Organization},
+  editor    = {Zhi-Hua Zhou},
+  pages     = {1266--1273},
+  year      = {2021},
+  month     = {8},
+  note      = {Main Track}
+  doi       = {10.24963/ijcai.2021/175},
+  url       = {https://doi.org/10.24963/ijcai.2021/175},
 }
+
 ```
