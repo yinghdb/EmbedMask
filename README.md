@@ -3,7 +3,7 @@
 This is repository is for the paper: EmbedMask: Embedding Coupling for One-stage Instance Segmentation;
 
 
-The full paper is available at: [https://www.ijcai.org/proceedings/2021/0175.pdf](https://www.ijcai.org/proceedings/2021/0175.pdf). 
+The full paper is available [here](https://www.ijcai.org/proceedings/2021/0175.pdf). 
 
 ## Installation
 This EmbedMask implementation is based on [FCOS](https://github.com/tianzhi0549/FCOS), which is also based on [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark). 
